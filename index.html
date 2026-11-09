@@ -28,6 +28,15 @@
   .tools { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:12px; }
   .tools .label { color:var(--sub); font-size:.85rem; margin-right:2px; }
   .note { color:var(--sub); font-size:.8rem; margin-top:16px; }
+  .lyrics { margin-top:12px; background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 16px; }
+  .lyrics .head { display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:space-between; }
+  .lyrics .head b { font-size:1rem; }
+  .lyrics .head .btns { display:flex; gap:6px; }
+  .lyrics .head button { padding:6px 12px; font-size:.85rem; }
+  .ltext { white-space:pre-wrap; font-size:var(--lsize,1.4rem); line-height:1.9; margin-top:10px; max-height:60vh; overflow:auto; }
+  .ltext.empty { font-size:.9rem; color:var(--sub); }
+  textarea { width:100%; min-height:260px; margin-top:10px; font:inherit; font-size:1rem; line-height:1.7; padding:10px; border:1px solid var(--line); border-radius:8px; }
+  .lnote { color:var(--sub); font-size:.75rem; margin-top:8px; }
   [hidden] { display:none !important; }
 </style>
 </head>
@@ -43,6 +52,23 @@
 
   <div class="stage" id="vstage"><video id="video" controls playsinline preload="metadata" controlsList="nodownload"></video></div>
   <div class="audio" id="astage" hidden><div class="t" id="atitle"></div><audio id="audio" controls preload="metadata" controlsList="nodownload"></audio></div>
+
+  <div class="lyrics" id="lyrics" hidden>
+    <div class="head">
+      <b>📄 かし</b>
+      <div class="btns">
+        <button id="lsmall" title="文字を小さく">A−</button>
+        <button id="lbig" title="文字を大きく">A＋</button>
+        <button id="ledit">書く・直す</button>
+      </div>
+    </div>
+    <div class="ltext" id="ltext"></div>
+    <div id="lform" hidden>
+      <textarea id="larea" placeholder="ここに歌詞を書くか、貼りつけてください"></textarea>
+      <div class="tools"><button id="lsave" class="on">保存</button><button id="lcancel">やめる</button></div>
+    </div>
+    <p class="lnote">※ 歌詞はこの端末（このブラウザ）の中だけに保存されます。ネットには公開されず、ほかの端末には出ません。</p>
+  </div>
 
   <div class="tools">
     <span class="label">速さ</span>
@@ -88,7 +114,37 @@ function select(v) {
   const el = isA ? audio : video;
   if (isA) document.getElementById('atitle').textContent = v.title;
   el.src = v.src; el.playbackRate = rate;
+  showLyrics(v);
 }
+// 歌詞：端末内（localStorage）だけに保存
+const LKEY = 'gakushu-lyrics-', lyr = document.getElementById('lyrics'), ltext = document.getElementById('ltext');
+const lform = document.getElementById('lform'), larea = document.getElementById('larea');
+const ledit = document.getElementById('ledit');
+let lsize = 1.4, curItem;
+const lget = k => { try { return localStorage.getItem(k); } catch(e) { return null; } };
+const lset = (k, v) => { try { localStorage.setItem(k, v); return true; } catch(e) { return false; } };
+const s0 = parseFloat(lget(LKEY + 'size')); if (s0) lsize = s0;
+function applySize() { ltext.style.setProperty('--lsize', lsize + 'rem'); }
+function showLyrics(v) {
+  curItem = v;
+  lyr.hidden = v.type !== 'audio';
+  lform.hidden = true; ltext.hidden = false; ledit.hidden = false;
+  const t = lget(LKEY + v.id) || '';
+  ltext.textContent = t || '歌詞はまだありません。「書く・直す」から入れられます。';
+  ltext.classList.toggle('empty', !t);
+  applySize();
+}
+ledit.onclick = () => {
+  larea.value = lget(LKEY + curItem.id) || '';
+  lform.hidden = false; ltext.hidden = true; ledit.hidden = true; larea.focus();
+};
+document.getElementById('lcancel').onclick = () => showLyrics(curItem);
+document.getElementById('lsave').onclick = () => {
+  if (!lset(LKEY + curItem.id, larea.value.trim())) alert('この端末では保存できませんでした（プライベートモードなど）。');
+  showLyrics(curItem);
+};
+document.getElementById('lbig').onclick = () => { lsize = Math.min(3, lsize + 0.2); lset(LKEY + 'size', lsize); applySize(); };
+document.getElementById('lsmall').onclick = () => { lsize = Math.max(0.9, lsize - 0.2); lset(LKEY + 'size', lsize); applySize(); };
 video.onloadedmetadata = audio.onloadedmetadata = e => { e.target.playbackRate = rate; };
 document.querySelectorAll('[data-rate]').forEach(b => b.onclick = () => {
   rate = +b.dataset.rate; video.playbackRate = rate; audio.playbackRate = rate;
